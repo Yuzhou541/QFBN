@@ -1,0 +1,70 @@
+task: "recovery_ce"
+
+run:
+  out_dir: "runs"
+  exp_name: "synth_recovery_ce"
+  seeds: [0, 1, 2, 3, 4]
+
+device:
+  prefer_cuda: true
+
+data:
+  n_train: 8192
+  n_val: 2048
+  n_test: 2048
+  input_dim: 20
+  n_classes: 5
+  x_dist: "normal"
+  x_scale: 1.0
+  logit_noise: 0.05    # additive Gaussian noise on teacher logits
+
+teacher:
+  hidden_dims: [64]
+  f_atoms: ["zero", "id", "sin", "poly2", "poly3", "tanh", "exp"]
+  g: "tanh"
+  p_zero: 0.60
+  atom_probs:
+    id: 0.20
+    sin: 0.20
+    poly2: 0.25
+    poly3: 0.10
+    tanh: 0.15
+    exp: 0.10
+  w_scale: 1.0
+  b_scale: 0.1
+  cache:
+    enabled: true
+    dir: "teacher_cache"
+    # per_seed: 每个 seed 一个 teacher
+    # shared: 不同 seed 共享同一 teacher（更适合 ICML 的对比实验）
+    scope: "shared"
+    shared_id: "teacher_v1"
+
+student:
+  hidden_dims: [64]
+  f_atoms: ["zero", "id", "sin", "poly2", "poly3", "tanh", "exp"]
+  g_mode: "fixed"
+  g_fixed: "tanh"
+  g_atoms: ["zero", "id", "relu", "tanh", "sigmoid"]
+  g_per_edge: false
+
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 2.0e-3
+  weight_decay: 0.0
+  grad_clip: 1.0
+
+  tau:
+    start: 2.0
+    end: 0.2
+    schedule: "exp"
+
+  regularizers:
+    lambda_entropy_f: 2.0e-3
+    lambda_degree_f: 5.0e-4
+    lambda_nonzero_f: 5.0e-4
+
+eval:
+  every: 10
+  save_plots: true

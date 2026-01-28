@@ -1,0 +1,72 @@
+task: "recovery_mse"
+
+run:
+  out_dir: "runs"
+  exp_name: "synth_recovery_mse"
+  seeds: [0, 1, 2, 3, 4]
+
+device:
+  prefer_cuda: true
+
+data:
+  n_train: 4096
+  n_val: 1024
+  n_test: 1024
+  input_dim: 16
+  output_dim: 4
+  x_dist: "normal"
+  x_scale: 1.0
+  noise_std: 0.05   # additive Gaussian noise on y
+
+teacher:
+  hidden_dims: [32]
+  f_atoms: ["zero", "id", "sin", "poly2", "poly3", "tanh", "exp"]
+  g: "tanh"            # fixed teacher activation (edge-wise shared per node)
+  p_zero: 0.55         # sparsity in teacher f
+  atom_probs:          # probs for NONZERO atoms (normalized internally)
+    id: 0.20
+    sin: 0.25
+    poly2: 0.20
+    poly3: 0.10
+    tanh: 0.15
+    exp: 0.10
+  w_scale: 1.0
+  b_scale: 0.1
+  cache:
+    enabled: true
+    dir: "teacher_cache"
+    scope: "shared"
+    shared_id: "teacher_v1"
+
+student:
+  hidden_dims: [32]
+  f_atoms: ["zero", "id", "sin", "poly2", "poly3", "tanh", "exp"]
+  # g selection is optional. For recovery, keep g fixed to match teacher and reduce confounds:
+  g_mode: "fixed"     # "fixed" or "select"
+  g_fixed: "tanh"
+  g_atoms: ["zero", "id", "relu", "tanh", "sigmoid"]
+  g_per_edge: false
+
+train:
+  epochs: 150
+  batch_size: 256
+  lr: 2.0e-3
+  weight_decay: 0.0
+  grad_clip: 1.0
+
+  tau:
+    start: 2.0
+    end: 0.2
+    schedule: "exp"    # "linear" or "exp"
+
+  regularizers:
+    # Encourage wave->particle collapse:
+    lambda_entropy_f: 2.0e-3
+    # Encourage low-degree selection:
+    lambda_degree_f: 5.0e-4
+    # Encourage sparsity (nonzero penalty):
+    lambda_nonzero_f: 5.0e-4
+
+eval:
+  every: 10
+  save_plots: true
